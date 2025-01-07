@@ -1,71 +1,91 @@
 #include <Wire.h>
-#include <MPU6050.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
 // BLE UUIDs
-#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHAR1_UUID          "beb5483e-36e1-4688-b7f5-ea07361b26a8"  // Used for sending sensor data
+#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHAR1_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 // BLE objects
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
-BLE2902* pBLE2902;
-
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
-// Initialize MPU6050 object
-MPU6050 mpu;
+// I2C Bus and MPU6050 sensors
+#define SDA2_PIN 25
+#define SCL2_PIN 26
+TwoWire I2C2 = TwoWire(1);
 
-// Thresholds for determining good or bad posture based on Z-axis values
+Adafruit_MPU6050 middleBackSensor;
+Adafruit_MPU6050 highBackSensor;
+Adafruit_MPU6050 leftShoulderSensor;
+Adafruit_MPU6050 rightShoulderSensor;
+
+// Posture thresholds
 const int goodPostureThresholdMin = 2600;
 const int goodPostureThresholdMax = 3000;
 
 // BLE Server Callbacks
 class MyServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer* pServer) {
-    deviceConnected = true;
-  }
-
-  void onDisconnect(BLEServer* pServer) {
-    deviceConnected = false;
-  }
+  void onConnect(BLEServer* pServer) override { deviceConnected = true; }
+  void onDisconnect(BLEServer* pServer) override { deviceConnected = false; }
 };
 
+// Function to initialize a sensor
+bool initializeSensor(Adafruit_MPU6050& sensor, const char* name, TwoWire* wire = &Wire, uint8_t address = 0x68) {
+  if (!sensor.begin(address, wire)) {
+    Serial.printf("%s not connected!\n", name);
+    return false;
+  }
+  Serial.printf("%s connected!\n", name);
+  return true;
+}
+
+// Function to read and process sensor data
+String readSensorData(Adafruit_MPU6050& sensor, const char* position) {
+  sensors_event_t a, g, temp;
+  sensor.getEvent(&a, &g, &temp);
+
+  // Determine posture
+  bool goodPosture = (a.acceleration.z >= goodPostureThresholdMin && a.acceleration.z <= goodPostureThresholdMax);
+
+  // Return compact JSON string
+  return String("{\"pos\":\"") + position +
+         "\",\"az\":" + a.acceleration.z +
+         ",\"p\":\"" + (goodPosture ? "G" : "B") + "\"}";
+}
+
+// Function to initialize all sensors
+void initializeSensors() {
+  Wire.begin(21, 22);
+  I2C2.begin(SDA2_PIN, SCL2_PIN);
+
+  initializeSensor(middleBackSensor, "Middle Back Sensor");
+  initializeSensor(highBackSensor, "High Back Sensor", &Wire, 0x69);
+  initializeSensor(leftShoulderSensor, "Left Shoulder Sensor", &I2C2);
+  initializeSensor(rightShoulderSensor, "Right Shoulder Sensor", &I2C2, 0x69);
+}
 
 void setup() {
-  Serial.begin(115200);   // Start serial communication
-  Wire.begin(21, 22);     // SDA = GPIO 21, SCL = GPIO 22
+  Serial.begin(115200);
 
-  // Initialize the MPU6050 sensor
-  mpu.initialize();
-  if (!mpu.testConnection()) {
-    Serial.println("MPU6050 connection failed");
-    while (1); // Halt if the sensor is not connected
-  }
-  Serial.println("MPU6050 connected successfully");
+  // Initialize sensors
+  initializeSensors();
 
   // Initialize BLE
   BLEDevice::setMTU(512);
-  BLEDevice::init("PostureDevice");  // BLE device name
+  BLEDevice::init("PostureDevice");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
   BLEService* pService = pServer->createService(SERVICE_UUID);
-
-  // Create BLE characteristic for sending sensor data
-  pCharacteristic = pService->createCharacteristic(
-    CHAR1_UUID,
-    BLECharacteristic::PROPERTY_NOTIFY
-  );
-
-  // Add descriptor for notification
-  pBLE2902 = new BLE2902();
-  pBLE2902->setNotifications(true);
-  pCharacteristic->addDescriptor(pBLE2902);
+  pCharacteristic = pService->createCharacteristic(CHAR1_UUID, BLECharacteristic::PROPERTY_NOTIFY);
+  pCharacteristic->addDescriptor(new BLE2902());
 
   pService->start();
   pServer->getAdvertising()->start();
@@ -73,39 +93,29 @@ void setup() {
 }
 
 void loop() {
-  // Read accelerometer data from MPU-6050
-  int16_t ax, ay, az;
-  mpu.getAcceleration(&ax, &ay, &az);
-
-  // Determine posture based on Z-axis value
-  bool goodPosture = (az >= abs(goodPostureThresholdMin) && az <= abs(goodPostureThresholdMax));
-
-  // Format posture data into JSON-like string
-  String postureData = String("{\"ax\":") + ax +
-                       ",\"ay\":" + ay +
-                       ",\"az\":" + az +
-                       ",\"posture\":\"" + (goodPosture ? "Good" : "Bad") + "\"}";
-
-  // Send data to the connected BLE client (iOS app)
   if (deviceConnected) {
-    // String simpleData = "Hello";
-    // pCharacteristic->setValue(simpleData.c_str());
-    // pCharacteristic->notify();
-    pCharacteristic->setValue(postureData.c_str());  // Send posture data
-    pCharacteristic->notify();  // Notify connected client
+    // Collect data from all sensors
+    String postureData = "[" +
+                         readSensorData(middleBackSensor, "MB") + "," +
+                         readSensorData(highBackSensor, "HB") + "," +
+                         readSensorData(leftShoulderSensor, "LS") + "," +
+                         readSensorData(rightShoulderSensor, "RS") + "]";
+
+    // Send data via BLE
+    pCharacteristic->setValue(postureData.c_str());
+    pCharacteristic->notify();
     Serial.println("Data sent: " + postureData);
   }
 
-  // Handle BLE connection status
+  // Handle connection state changes
   if (!deviceConnected && oldDeviceConnected) {
-    delay(500); // Allow Bluetooth stack time to clean up
-    pServer->startAdvertising(); // Restart advertising
-    Serial.println("Restart advertising");
+    delay(500); // Allow disconnection to complete
+    pServer->startAdvertising();
+    Serial.println("Restarting advertising...");
+    oldDeviceConnected = deviceConnected;
+  } else if (deviceConnected && !oldDeviceConnected) {
     oldDeviceConnected = deviceConnected;
   }
-  if (deviceConnected && !oldDeviceConnected) {
-    oldDeviceConnected = deviceConnected;
-  }
-  // Serial.println(postureData);
-  delay(1000);  // Wait for 1 second between readings
+
+  delay(1000); // 1-second interval
 }
