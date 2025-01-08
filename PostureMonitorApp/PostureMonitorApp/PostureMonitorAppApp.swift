@@ -1,20 +1,20 @@
+////
+////  PostureMonitorAppApp.swift
+////  PostureMonitorApp
+////
+////  Created by Ahmad Capstone on 2025-01-07.
+////
 //
-//  PostureMonitorAppApp.swift
-//  PostureMonitorApp
+//import SwiftUI
 //
-//  Created by Ahmad Capstone on 2025-01-07.
+//@main
+//struct PostureMonitorApp: App {
+//    let persistenceController = PersistenceController.shared
 //
-
-import SwiftUI
-
-@main
-struct PostureMonitorApp: App {
-    let persistenceController = PersistenceController.shared
-
-    var body: some Scene {
-        WindowGroup {
-            ContentView() // Replace with your main content view
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
-        }
-    }
-}
+//    var body: some Scene {
+//        WindowGroup {
+//            ContentView() // Replace with your main content view
+//                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+//        }
+//    }
+//}

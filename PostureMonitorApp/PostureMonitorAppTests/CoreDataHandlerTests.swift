@@ -1,68 +1,112 @@
 import XCTest
-import CoreData
-@testable import PostureMonitorApp
+@testable import PostureMonitorApp // Replace with your app's module name
 
-class CoreDataHandlerTests: XCTestCase {
-    var persistenceController: PersistenceController!
-    var context: NSManagedObjectContext!
+final class TestDataHandler: XCTestCase {
+    var dataHandler: DataHandler!
     var coreDataHandler: CoreDataHandler!
 
-    override func setUp() {
-        super.setUp()
-
-        // Ensure PersistenceController is initialized
-        persistenceController = PersistenceController(inMemory: true)
-        // Set the context after loading stores
-        context = persistenceController.container.viewContext
-
-        // Initialize CoreDataHandler with the test context
-        coreDataHandler = CoreDataHandler(context: context)
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        dataHandler = DataHandler()
+        coreDataHandler = CoreDataHandler.shared
+        
+        // Clean up existing data in Core Data before tests
+        coreDataHandler.deleteAllPostureData()
     }
 
-    override func tearDown() {
-        persistenceController = nil
-        context = nil
+    override func tearDownWithError() throws {
+        dataHandler = nil
         coreDataHandler = nil
-        super.tearDown()
+        try super.tearDownWithError()
     }
 
-    func testInsertAndFetchPostureData() {
-        // Create a test data object
-        let testData = PostureData(
-            timestamp: Date(),
-            position: "MB",
-            accelerationZ: -9.81,
-            postureStatus: "Good"
-        )
-
-        // Insert data into Core Data
-        coreDataHandler.insertPostureData(data: testData)
-
-        // Fetch data from Core Data
-        let fetchedData = coreDataHandler.fetchPostureData()
-
-        XCTAssertFalse(fetchedData.isEmpty, "Fetched data should not be empty.")
-        XCTAssertEqual(fetchedData.last?.position, "MB", "Position should match.")
-        XCTAssertEqual(fetchedData.last?.accelerationZ, -9.81, "Acceleration Z should match.")
-    }
-
-    func testParseAndStoreData() {
-        // JSON string for testing
-        let jsonString = """
+    // Test processData function in DataHandler
+    func testProcessData_2() {
+        let jsonData = """
         [
-            {"pos":"MB","az":-9.81,"p":"G"},
-            {"pos":"LS","az":-7.00,"p":"B"}
+            {"pos":"MB", "az":2850.5, "p":"G"},
+            {"pos":"HB", "az":2800.0, "p":"B"}
         ]
         """
 
-        // Parse and store the JSON data
-        DataManager.shared.parseAndStoreData(jsonString: jsonString)
+        dataHandler.processData(jsonData)
 
-        // Fetch data from Core Data
         let fetchedData = coreDataHandler.fetchPostureData()
+        XCTAssertEqual(fetchedData.count, 2, "Expected 2 records in Core Data.")
 
-        XCTAssertEqual(fetchedData.count, 2, "There should be 2 records.")
-        XCTAssertEqual(fetchedData.first?.position, "MB", "First record's position should match.")
-        XCTAssertEqual(fetchedData.last?.position, "LS", "Last record's position should match.")
+        // Validate the first record
+        let firstRecord = fetchedData[0]
+        XCTAssertEqual(firstRecord.position, "MB", "Incorrect position in first record.")
+        XCTAssertEqual(firstRecord.accelerationZ, 2850.5, "Incorrect accelerationZ in first record.")
+        XCTAssertEqual(firstRecord.postureStatus, "G", "Incorrect postureStatus in first record.")
+    }
+    
+    func testProcessData() {
+        // Sample JSON with two records
+        let sampleJSON = """
+        [
+            {"pos":"MB", "az":2600.0, "p":"G"},
+            {"pos":"HB", "az":2800.0, "p":"B"}
+        ]
+        """
+
+        let dataHandler = DataHandler()
+        dataHandler.processData(sampleJSON)
+
+        let savedData = CoreDataHandler.shared.fetchPostureData()
+        XCTAssertEqual(savedData.count, 2, "Expected 2 records, but found (savedData.count)")
+    }
+    
+
+    // Test savePostureData in CoreDataHandler
+    func testSavePostureData() {
+        let testData = PostureData(
+            timestamp: Date(),
+            position: "LS",
+            accelerationZ: 2900.7,
+            postureStatus: "G"
+        )
+
+        coreDataHandler.savePostureData(postureData: testData)
+
+        let fetchedData = coreDataHandler.fetchPostureData()
+        XCTAssertEqual(fetchedData.count, 1, "Expected 1 record in Core Data.")
+
+        let savedRecord = fetchedData[0]
+        XCTAssertEqual(savedRecord.position, "LS", "Incorrect position in saved record.")
+        XCTAssertEqual(savedRecord.accelerationZ, 2900.7, "Incorrect accelerationZ in saved record.")
+        XCTAssertEqual(savedRecord.postureStatus, "G", "Incorrect postureStatus in saved record.")
+    }
+
+    // Test fetchPostureData in CoreDataHandler
+    func testFetchPostureData() {
+        // Insert test data
+        let testData1 = PostureData(timestamp: Date(), position: "MB", accelerationZ: 2800.0, postureStatus: "G")
+        let testData2 = PostureData(timestamp: Date(), position: "HB", accelerationZ: 2700.0, postureStatus: "B")
+        coreDataHandler.savePostureData(postureData: testData1)
+        coreDataHandler.savePostureData(postureData: testData2)
+
+        let fetchedData = coreDataHandler.fetchPostureData()
+        XCTAssertEqual(fetchedData.count, 2, "Expected 2 records in Core Data.")
+
+        // Validate data integrity
+        XCTAssertTrue(fetchedData.contains(where: { $0.position == "MB" && $0.accelerationZ == 2800.0 && $0.postureStatus == "G" }))
+        XCTAssertTrue(fetchedData.contains(where: { $0.position == "HB" && $0.accelerationZ == 2700.0 && $0.postureStatus == "B" }))
+    }
+
+    // Test deleteAllPostureData in CoreDataHandler
+    func testDeleteAllPostureData() {
+        // Insert test data
+        let testData = PostureData(timestamp: Date(), position: "MB", accelerationZ: 2800.0, postureStatus: "G")
+        coreDataHandler.savePostureData(postureData: testData)
+
+        var fetchedData = coreDataHandler.fetchPostureData()
+        XCTAssertEqual(fetchedData.count, 1, "Expected 1 record before deletion.")
+
+        // Perform delete operation
+        coreDataHandler.deleteAllPostureData()
+
+        fetchedData = coreDataHandler.fetchPostureData()
+        XCTAssertEqual(fetchedData.count, 0, "Expected 0 records after deletion.")
     }
 }
