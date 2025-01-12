@@ -1,20 +1,23 @@
-////
-////  PostureMonitorAppApp.swift
-////  PostureMonitorApp
-////
-////  Created by Ahmad Capstone on 2025-01-07.
-////
-//
+////////
+////////  PostureMonitorAppApp.swift
+////////  PostureMonitorApp
+////////
+////////  Created by Ahmad Capstone on 2025-01-07.
+////////
+//////
 //import SwiftUI
 //
 //@main
 //struct PostureMonitorApp: App {
-//    let persistenceController = PersistenceController.shared
+//    // Use AppDelegate for setup
+//    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+//    let bleviewModel = BLEViewModel()
 //
 //    var body: some Scene {
 //        WindowGroup {
-//            ContentView() // Replace with your main content view
-//                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+//            BLEView()
+//                .environment(\.managedObjectContext, appDelegate.persistentContainer.viewContext)
+//                .environmentObject(bleViewModel)
 //        }
 //    }
 //}
