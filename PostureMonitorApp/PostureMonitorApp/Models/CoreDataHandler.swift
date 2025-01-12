@@ -1,19 +1,15 @@
 import Foundation
 import CoreData
-import UIKit
 
 class CoreDataHandler {
-    static let shared = CoreDataHandler() // Singleton instance
     private let context: NSManagedObjectContext
 
-    private init() {
-        let appDelegate = UIApplication.shared.delegate as! AppDelegate
-        self.context = appDelegate.persistentContainer.viewContext
+    init(context: NSManagedObjectContext) {
+        self.context = context
     }
 
-    // MARK: - Save Data
     func savePostureData(postureData: PostureData) {
-        let entity = NSEntityDescription.entity(forEntityName: "PostureEntity", in: context)! // Use "PostureEntity"
+        let entity = NSEntityDescription.entity(forEntityName: "PostureEntity", in: context)!
         let postureEntity = NSManagedObject(entity: entity, insertInto: context)
 
         postureEntity.setValue(postureData.timestamp, forKey: "timestamp")
@@ -23,15 +19,19 @@ class CoreDataHandler {
 
         do {
             try context.save()
-            print("Posture data saved successfully.")
-        } catch let error as NSError {
-            print("Failed to save data: \(error), \(error.userInfo)")
+//            print("Posture data saved successfully.")
+        } catch {
+            print("Failed to save posture data: \(error.localizedDescription)")
         }
     }
 
-    // MARK: - Fetch Data
     func fetchPostureData() -> [PostureData] {
-        let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: "PostureEntity") // Use "PostureEntity"
+        let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: "PostureEntity")
+
+        // Add a sort descriptor for consistent ordering
+        let sortDescriptor = NSSortDescriptor(key: "timestamp", ascending: true)
+        fetchRequest.sortDescriptors = [sortDescriptor]
+
         var postureDataList: [PostureData] = []
 
         do {
@@ -41,28 +41,35 @@ class CoreDataHandler {
                    let position = result.value(forKey: "position") as? String,
                    let accelerationZ = result.value(forKey: "accelerationZ") as? Float,
                    let postureStatus = result.value(forKey: "postureStatus") as? String {
-                    let postureData = PostureData(timestamp: timestamp, position: position, accelerationZ: accelerationZ, postureStatus: postureStatus)
+                    let postureData = PostureData(
+                        timestamp: timestamp,
+                        position: position,
+                        accelerationZ: accelerationZ,
+                        postureStatus: postureStatus
+                    )
                     postureDataList.append(postureData)
+                } else{
+                    print("Invalid Record: \(result)")
                 }
             }
-        } catch let error as NSError {
-            print("Failed to fetch data: \(error), \(error.userInfo)")
+        } catch {
+            print("Failed to fetch posture data: \(error.localizedDescription)")
         }
 
         return postureDataList
     }
-
-    // MARK: - Delete Data
     func deleteAllPostureData() {
-        let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "PostureEntity") // Use "PostureEntity"
-        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+        let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "PostureEntity")
 
         do {
-            try context.execute(deleteRequest)
+            let results = try context.fetch(fetchRequest) as! [NSManagedObject]
+            for object in results {
+                context.delete(object)
+            }
             try context.save()
             print("All posture data deleted successfully.")
-        } catch let error as NSError {
-            print("Failed to delete data: \(error), \(error.userInfo)")
+        } catch {
+            print("Failed to delete all posture data: \(error.localizedDescription)")
         }
     }
 }

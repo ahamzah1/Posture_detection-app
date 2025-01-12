@@ -1,25 +1,49 @@
 import XCTest
 import CoreBluetooth
+import CoreData
 @testable import PostureMonitorApp // Replace with your app's module name
 
 final class TestBLEManagerIntegration: XCTestCase, BLEManagerDelegate {
     var bleManager: BLEManager!
+    var dataHandler: DataHandler!
     var coreDataHandler: CoreDataHandler!
+    var persistentContainer: NSPersistentContainer!
     var receivedData: [String] = []
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        bleManager = BLEManager()
+
+        // Set up an in-memory Core Data stack
+        persistentContainer = NSPersistentContainer(name: "PostureModel")
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        persistentContainer.persistentStoreDescriptions = [description]
+        persistentContainer.loadPersistentStores { _, error in
+            if let error = error {
+                fatalError("Failed to set up in-memory Core Data store: \(error)")
+            }
+        }
+
+        // Initialize CoreDataHandler with the in-memory context
+        let context = persistentContainer.viewContext
+        coreDataHandler = CoreDataHandler(context: context)
+
+        // Initialize DataHandler with CoreDataHandler dependency
+        dataHandler = DataHandler(context: context)
+
+        // Initialize BLEManager with DataHandler dependency
+        bleManager = BLEManager(dataHandler: dataHandler)
         bleManager.delegate = self
-        coreDataHandler = CoreDataHandler.shared
-        
-        // Clean up existing Core Data
+
+        // Clean Core Data before tests
         coreDataHandler.deleteAllPostureData()
     }
 
     override func tearDownWithError() throws {
         bleManager = nil
+        dataHandler = nil
         coreDataHandler = nil
+        persistentContainer = nil
         receivedData = []
         try super.tearDownWithError()
     }
@@ -38,39 +62,7 @@ final class TestBLEManagerIntegration: XCTestCase, BLEManagerDelegate {
 
     // MARK: - Test Cases
 
-    // Test if BLEManager processes incoming data correctly
-//    func testBLEManagerProcessesData() {
-//        // Simulate incoming data via BLE
-//        let incomingData = """
-//        [
-//            {"pos":"MB", "az":2850.5, "p":"G"},
-//            {"pos":"HB", "az":2800.0, "p":"B"}
-//        ]
-//        """
-//        bleManager.delegate?.didReceiveData(incomingData)
-//
-//        // Fetch data from Core Data to validate
-//        let fetchedData = coreDataHandler.fetchPostureData()
-//        XCTAssertEqual(fetchedData.count, 2, "Expected 2 records in Core Data.")
-//
-////        // Validate the first record
-////        let firstRecord = fetchedData[0]
-////        XCTAssertEqual(firstRecord.position, "MB", "Incorrect position in the first record.")
-////        XCTAssertEqual(firstRecord.accelerationZ, 2850.5, "Incorrect accelerationZ in the first record.")
-////        XCTAssertEqual(firstRecord.postureStatus, "G", "Incorrect postureStatus in the first record.")
-//    }
-
-    // Test invalid data handling
-    func testBLEManagerHandlesInvalidData() {
-        let invalidData = "Invalid JSON Data"
-        bleManager.delegate?.didReceiveData(invalidData)
-
-        // Ensure no data is stored in Core Data
-        let fetchedData = coreDataHandler.fetchPostureData()
-        XCTAssertEqual(fetchedData.count, 0, "Expected no records in Core Data for invalid data.")
-    }
-    
-    func testBLEManagerProcessesData() {
+    func testBLEManagerProcessesData() throws {
         // Simulate incoming data via BLE
         let incomingData = """
         [
@@ -80,23 +72,33 @@ final class TestBLEManagerIntegration: XCTestCase, BLEManagerDelegate {
         """
         bleManager.delegate?.didReceiveData(incomingData)
 
-        // Wait for potential async processing
-        sleep(1)
+        // Wait for asynchronous processing
+        let expectation = self.expectation(description: "Core Data save completion")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
 
         // Fetch data from Core Data to validate
         let fetchedData = coreDataHandler.fetchPostureData()
-        print("Fetched Data: \(fetchedData)")
-
         XCTAssertEqual(fetchedData.count, 2, "Expected 2 records in Core Data.")
 
-        // Additional validation
-        if fetchedData.count > 0 {
-            print("First Record: \(fetchedData[0])")
-        }
+        // Validate the first record
+        let firstRecord = fetchedData[0]
+        XCTAssertEqual(firstRecord.position, "MB", "Incorrect position in first record.")
+        XCTAssertEqual(firstRecord.accelerationZ, 2850.5, "Incorrect accelerationZ in first record.")
+        XCTAssertEqual(firstRecord.postureStatus, "G", "Incorrect postureStatus in first record.")
     }
 
-    
-    // Test if BLEManagerDelegate methods are triggered
+    func testBLEManagerHandlesInvalidData() {
+        let invalidData = "Invalid JSON Data"
+        bleManager.delegate?.didReceiveData(invalidData)
+
+        // Ensure no data is stored in Core Data
+        let fetchedData = coreDataHandler.fetchPostureData()
+        XCTAssertEqual(fetchedData.count, 0, "Expected no records in Core Data for invalid data.")
+    }
+
     func testBLEManagerDelegateMethodsCalled() {
         let incomingData = """
         [
@@ -109,7 +111,6 @@ final class TestBLEManagerIntegration: XCTestCase, BLEManagerDelegate {
         XCTAssertEqual(receivedData[0], incomingData, "Received data does not match expected data.")
     }
 
-    // Test Core Data cleanup through BLEManager integration
     func testBLEManagerClearsCoreData() {
         // Simulate incoming data and save it
         let incomingData = """
@@ -118,7 +119,14 @@ final class TestBLEManagerIntegration: XCTestCase, BLEManagerDelegate {
         ]
         """
         bleManager.delegate?.didReceiveData(incomingData)
-        sleep(1)
+
+        // Wait for asynchronous processing
+        let expectation = self.expectation(description: "Core Data save completion")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
+
         // Verify data is stored
         var fetchedData = coreDataHandler.fetchPostureData()
         XCTAssertEqual(fetchedData.count, 1, "Expected 1 record in Core Data.")

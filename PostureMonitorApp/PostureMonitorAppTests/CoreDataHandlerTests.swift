@@ -1,27 +1,47 @@
 import XCTest
+import CoreData
 @testable import PostureMonitorApp // Replace with your app's module name
 
 final class TestDataHandler: XCTestCase {
     var dataHandler: DataHandler!
     var coreDataHandler: CoreDataHandler!
+    var persistentContainer: NSPersistentContainer!
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        dataHandler = DataHandler()
-        coreDataHandler = CoreDataHandler.shared
-        
-        // Clean up existing data in Core Data before tests
+
+        // Set up in-memory Core Data stack for testing
+        persistentContainer = NSPersistentContainer(name: "PostureModel")
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        persistentContainer.persistentStoreDescriptions = [description]
+
+        persistentContainer.loadPersistentStores { _, error in
+            if let error = error {
+                fatalError("Failed to set up in-memory Core Data store: \(error)")
+            }
+        }
+
+        // Initialize handlers with test context
+        let context = persistentContainer.viewContext
+        coreDataHandler = CoreDataHandler(context: context)
+        dataHandler = DataHandler(context: context)
+
+        // Clean up any pre-existing data
         coreDataHandler.deleteAllPostureData()
     }
 
     override func tearDownWithError() throws {
         dataHandler = nil
         coreDataHandler = nil
+        persistentContainer = nil
         try super.tearDownWithError()
     }
 
+    // MARK: - Tests
+
     // Test processData function in DataHandler
-    func testProcessData_2() {
+    func testProcessData() {
         let jsonData = """
         [
             {"pos":"MB", "az":2850.5, "p":"G"},
@@ -40,23 +60,6 @@ final class TestDataHandler: XCTestCase {
         XCTAssertEqual(firstRecord.accelerationZ, 2850.5, "Incorrect accelerationZ in first record.")
         XCTAssertEqual(firstRecord.postureStatus, "G", "Incorrect postureStatus in first record.")
     }
-    
-    func testProcessData() {
-        // Sample JSON with two records
-        let sampleJSON = """
-        [
-            {"pos":"MB", "az":2600.0, "p":"G"},
-            {"pos":"HB", "az":2800.0, "p":"B"}
-        ]
-        """
-
-        let dataHandler = DataHandler()
-        dataHandler.processData(sampleJSON)
-
-        let savedData = CoreDataHandler.shared.fetchPostureData()
-        XCTAssertEqual(savedData.count, 2, "Expected 2 records, but found (savedData.count)")
-    }
-    
 
     // Test savePostureData in CoreDataHandler
     func testSavePostureData() {
