@@ -1,15 +1,8 @@
-//
-//  PostureMonitorAppApp.swift
-//  PostureMonitorApp
-//
-//  Created by Ahmad Capstone on 2025-01-11.
-//
-
 import SwiftUI
 import CoreData
 
 @main
-struct PostureMonitorApp: App {
+struct AlignProApp: App {
     // Persistent container for Core Data
     let persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "PostureModel")
@@ -32,7 +25,7 @@ struct PostureMonitorApp: App {
 
     var body: some Scene {
         WindowGroup {
-            BLEView() // Main BLE View
+            ContentView() // Main BLE View
                 .environment(\.managedObjectContext, persistentContainer.viewContext) // Inject Core Data
                 .environmentObject(bleViewModel) // Inject BLEViewModel
         }

@@ -1,3 +1,7 @@
-PostureMonitorApp/PostureMonitorApp.xcodeproj
-PostureMonitorApp/PostureMonitorApp/Info.plist
-PostureMonitorApp/PostureMonitorAppUITests
+AlignPro/AlignPro.xcodeproj
+AlignPro/images
+AlignPro/AlignPro/Info.plist
+AlignPro/AlignPro/Assets.xcassets
+APP_Backend/.env
+APP_Backend/node_modules
+APP_Backend/package-lock.json
