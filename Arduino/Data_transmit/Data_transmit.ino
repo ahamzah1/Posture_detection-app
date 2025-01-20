@@ -29,6 +29,11 @@ Adafruit_MPU6050 rightShoulderSensor;
 // Posture thresholds
 const int goodPostureThresholdMin = 2600;
 const int goodPostureThresholdMax = 3000;
+const int badPostureDuration = 5; // seconds
+
+// Posture state and timers
+char previousPosture[4] = {'G', 'G', 'G', 'G'};
+int deviationCounters[4] = {0, 0, 0, 0};
 
 // BLE Server Callbacks
 class MyServerCallbacks : public BLEServerCallbacks {
@@ -46,18 +51,20 @@ bool initializeSensor(Adafruit_MPU6050& sensor, const char* name, TwoWire* wire 
   return true;
 }
 
-// Function to read and process sensor data
-String readSensorData(Adafruit_MPU6050& sensor, const char* position) {
+// Function to check posture with deviation logic
+char checkPosture(Adafruit_MPU6050& sensor, int sensorIndex) {
   sensors_event_t a, g, temp;
   sensor.getEvent(&a, &g, &temp);
 
-  // Determine posture
-  bool goodPosture = (a.acceleration.z >= goodPostureThresholdMin && a.acceleration.z <= goodPostureThresholdMax);
-
-  // Return compact JSON string
-  return String("{\"pos\":\"") + position +
-         "\",\"az\":" + a.acceleration.z +
-         ",\"p\":\"" + (goodPosture ? "G" : "B") + "\"}";
+  if (a.acceleration.z < goodPostureThresholdMin || a.acceleration.z > goodPostureThresholdMax) {
+    deviationCounters[sensorIndex]++;
+    if (deviationCounters[sensorIndex] >= badPostureDuration) {
+      return 'B'; // Bad posture
+    }
+  } else {
+    deviationCounters[sensorIndex] = 0; // Reset counter if back within range
+  }
+  return 'G'; // Good posture
 }
 
 // Function to initialize all sensors
@@ -94,17 +101,33 @@ void setup() {
 
 void loop() {
   if (deviceConnected) {
-    // Collect data from all sensors
-    String postureData = "[" +
-                         readSensorData(middleBackSensor, "MB") + "," +
-                         readSensorData(highBackSensor, "HB") + "," +
-                         readSensorData(leftShoulderSensor, "LS") + "," +
-                         readSensorData(rightShoulderSensor, "RS") + "]";
+    // Check posture for each sensor
+    char currentPosture[4];
+    currentPosture[0] = checkPosture(middleBackSensor, 0);
+    currentPosture[1] = checkPosture(highBackSensor, 1);
+    currentPosture[2] = checkPosture(leftShoulderSensor, 2);
+    currentPosture[3] = checkPosture(rightShoulderSensor, 3);
 
-    // Send data via BLE
-    pCharacteristic->setValue(postureData.c_str());
-    pCharacteristic->notify();
-    Serial.println("Data sent: " + postureData);
+    // Only send data if there is a change in posture status
+    if (currentPosture[0] != previousPosture[0] ||
+        currentPosture[1] != previousPosture[1] ||
+        currentPosture[2] != previousPosture[2] ||
+        currentPosture[3] != previousPosture[3]) {
+      
+      String postureData = String("{\"MB\":\"") + currentPosture[0] +
+                           "\",\"HB\":\"" + currentPosture[1] +
+                           "\",\"LS\":\"" + currentPosture[2] +
+                           "\",\"RS\":\"" + currentPosture[3] + "\"}";
+
+      pCharacteristic->setValue(postureData.c_str());
+      pCharacteristic->notify();
+      Serial.println("Data sent: " + postureData);
+
+      // Update previous posture states
+      for (int i = 0; i < 4; i++) {
+        previousPosture[i] = currentPosture[i];
+      }
+    }
   }
 
   // Handle connection state changes
