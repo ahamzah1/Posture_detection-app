@@ -5,3 +5,7 @@ AlignPro/AlignPro/Assets.xcassets
 APP_Backend/.env
 APP_Backend/node_modules
 APP_Backend/package-lock.json
+.terraform
+.terraform.lock.hcl
+AlignPro/AlignPro/AlignPro.xcodeproj
+AlignPro/AlignPro/images

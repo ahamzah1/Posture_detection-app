@@ -5,21 +5,35 @@ import CoreData
 protocol BLEManagerDelegate: AnyObject {
     func didUpdateStatus(_ status: String)
     func didReceiveData(_ data: String)
+    func didDiscoverDevice(_ device: BLEDevice)
 }
 
 class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+    // MARK: - Properties
     private var centralManager: CBCentralManager!
     private var connectedPeripheral: CBPeripheral?
     private var dataCharacteristic: CBCharacteristic?
+    private let dataHandler: DataHandler
 
     weak var delegate: BLEManagerDelegate?
-    private let dataHandler: DataHandler // Dependency Injection
+
+    private var pairedDeviceID: UUID? {
+        get {
+            if let storedID = UserDefaults.standard.string(forKey: "PairedDeviceID") {
+                return UUID(uuidString: storedID)
+            }
+            return nil
+        }
+        set {
+            UserDefaults.standard.set(newValue?.uuidString, forKey: "PairedDeviceID")
+        }
+    }
 
     var isScanning = false
 
+    // Bluetooth Identifiers
     private let serviceUUID = CBUUID(string: "4fafc201-1fb5-459e-8fcc-c5c9c331914b")
     private let characteristicUUID = CBUUID(string: "beb5483e-36e1-4688-b7f5-ea07361b26a8")
-    private let targetDeviceName = "PostureDevice" // Replace with your device's name
 
     // MARK: - Initializer
     init(dataHandler: DataHandler) {
@@ -28,26 +42,63 @@ class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         centralManager = CBCentralManager(delegate: self, queue: DispatchQueue.main)
     }
 
-    // MARK: - Start Scanning
+    // MARK: - Public Methods
     func startScan() {
         guard centralManager.state == .poweredOn else {
             delegate?.didUpdateStatus("Bluetooth is not ready.")
             return
         }
-        guard !isScanning else { return }
 
+        guard !isScanning else { return }
         isScanning = true
         centralManager.scanForPeripherals(withServices: nil, options: nil)
         delegate?.didUpdateStatus("Scanning for devices...")
     }
 
-    // MARK: - Stop Scanning
     func stopScan() {
         guard isScanning else { return }
-
         isScanning = false
         centralManager.stopScan()
         delegate?.didUpdateStatus("Scanning stopped.")
+    }
+
+    func pairWithDevice(_ device: BLEDevice) {
+        guard let peripheral = centralManager.retrievePeripherals(withIdentifiers: [device.id]).first else {
+            delegate?.didUpdateStatus("Device not found for pairing.")
+            return
+        }
+
+        stopScan()
+        pairedDeviceID = device.id
+        connectedPeripheral = peripheral
+        connectedPeripheral?.delegate = self
+        centralManager.connect(peripheral)
+        delegate?.didUpdateStatus("Pairing with \(device.name)...")
+    }
+
+    func unpairDevice() {
+        if let connectedPeripheral = connectedPeripheral {
+            centralManager.cancelPeripheralConnection(connectedPeripheral)
+        }
+        pairedDeviceID = nil
+        delegate?.didUpdateStatus("Device unpaired.")
+    }
+
+    func connectToPairedDevice() {
+        guard let pairedID = pairedDeviceID else {
+            delegate?.didUpdateStatus("No paired device found.")
+            return
+        }
+
+        let peripherals = centralManager.retrievePeripherals(withIdentifiers: [pairedID])
+        if let peripheral = peripherals.first {
+            connectedPeripheral = peripheral
+            connectedPeripheral?.delegate = self
+            centralManager.connect(peripheral)
+            delegate?.didUpdateStatus("Connecting to paired device: \(peripheral.name ?? "Unknown")")
+        } else {
+            delegate?.didUpdateStatus("Paired device not found.")
+        }
     }
 
     // MARK: - CBCentralManagerDelegate
@@ -56,6 +107,7 @@ class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         switch central.state {
         case .poweredOn:
             statusMessage = "Bluetooth is ON."
+            connectToPairedDevice() // Automatically connect to paired device if available
         case .poweredOff:
             statusMessage = "Bluetooth is OFF. Please turn it on."
         case .unauthorized:
@@ -71,25 +123,12 @@ class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
         delegate?.didUpdateStatus(statusMessage)
     }
-    
+
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        print("Discovered device: \(peripheral.name ?? "Unknown") with RSSI: \(RSSI)")
-        print("Advertisement Data: \(advertisementData)")
-
-        // Filter by target device name
-        guard let name = peripheral.name, name == targetDeviceName else {
-            print("Device \(peripheral.name ?? "Unknown") does not match target device name \(targetDeviceName)")
-            return
-        }
-
-        print("Target device \(name) found. Stopping scan and connecting...")
-        stopScan()
-        connectedPeripheral = peripheral
-        connectedPeripheral?.delegate = self
-        central.connect(peripheral)
-        delegate?.didUpdateStatus("Connecting to (name)...")
+        let deviceName = peripheral.name ?? "Unknown Device"
+        let device = BLEDevice(name: deviceName, id: peripheral.identifier)
+        delegate?.didDiscoverDevice(device)
     }
-    
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         delegate?.didUpdateStatus("Connected to \(peripheral.name ?? "Unknown Device")")
@@ -102,6 +141,10 @@ class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         delegate?.didUpdateStatus("Disconnected from \(peripheral.name ?? "Unknown Device")")
+        if peripheral.identifier == pairedDeviceID {
+            delegate?.didUpdateStatus("Paired device disconnected. Reconnecting...")
+            connectToPairedDevice()
+        }
     }
 
     // MARK: - CBPeripheralDelegate

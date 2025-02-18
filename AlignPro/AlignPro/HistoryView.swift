@@ -1,3 +1,10 @@
+//
+//  HistoryView.swift
+//  AlignPro
+//
+//  Created by Ty Greenwood on 2024-12-30.
+//
+
 import SwiftUI
 
 struct HistoryView: View {

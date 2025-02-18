@@ -1,3 +1,10 @@
+//
+//  SetGoodPostureView.swift
+//  AlignPro
+//
+//  Created by Jim Greenwood on 2024-12-30.
+//
+
 import SwiftUI
 
 struct SetGoodPostureView: View {

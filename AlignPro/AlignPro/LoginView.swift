@@ -1,3 +1,10 @@
+//
+//  LoginView.swift
+//  AlignPro
+//
+//  Created by Jim Greenwood on 2025-01-02.
+//
+
 import SwiftUI
 
 struct LoginView: View {
@@ -49,6 +56,13 @@ struct LoginView: View {
             .clipShape(Capsule())
             
             Spacer()
+            
+            NavigationLink(destination: SignUpView(isLoggedIn: $isLoggedIn)) {
+                Text("Don't have an account? Sign Up")
+                    .foregroundColor(.blue)
+                    .padding(.bottom)
+            }
+            
         }
     }
     
@@ -56,7 +70,7 @@ struct LoginView: View {
         isLoading = true
         wrongEmailOrPassword = false
         
-        guard let url = URL(string: "<IP_ADDRESS>/api/login") else {
+        guard let url = URL(string: "<Ip-address>/api/login") else {
             errorMessage = "Invalid server URL"
             wrongEmailOrPassword = true
             isLoading = false

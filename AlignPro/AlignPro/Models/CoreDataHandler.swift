@@ -14,7 +14,6 @@ class CoreDataHandler {
 
         postureEntity.setValue(postureData.timestamp, forKey: "timestamp")
         postureEntity.setValue(postureData.position, forKey: "position")
-        postureEntity.setValue(postureData.accelerationZ, forKey: "accelerationZ")
         postureEntity.setValue(postureData.postureStatus, forKey: "postureStatus")
 
         do {
@@ -39,12 +38,10 @@ class CoreDataHandler {
             for result in results {
                 if let timestamp = result.value(forKey: "timestamp") as? Date,
                    let position = result.value(forKey: "position") as? String,
-                   let accelerationZ = result.value(forKey: "accelerationZ") as? Float,
                    let postureStatus = result.value(forKey: "postureStatus") as? String {
                     let postureData = PostureData(
                         timestamp: timestamp,
                         position: position,
-                        accelerationZ: accelerationZ,
                         postureStatus: postureStatus
                     )
                     postureDataList.append(postureData)

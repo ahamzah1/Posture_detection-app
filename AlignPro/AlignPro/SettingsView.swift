@@ -6,9 +6,9 @@ struct SettingsView: View {
 //    @Binding var correctPassword: String
     
     @State private var notificationsOn = true
-    @State var emailAddress: String = ""
-    @State var password: String = ""
-    
+//    @State var emailAddress: String = ""
+//    @State var password: String = ""
+//    
     var body: some View {
         NavigationView {
             ZStack {
@@ -32,52 +32,52 @@ struct SettingsView: View {
                     }
                     .toggleStyle(SwitchToggleStyle(tint: Color("AccentColor")))
                     .padding([.leading, .bottom, .trailing])
+//                    
+//                    NavigationLink(destination: SetGoodPostureView()) {
+//                        Text("Set Good Posture")
+//                    }
+//                    .padding(.all)
+//                    .foregroundStyle(Color("Button Text Colour"))
+//                    .fontWeight(.semibold)
+//                    .background(Color("AccentColor"))
+//                    .clipShape(Capsule())
+//                    
+//                    Text("Update Email Address")
+//                        .font(.title2)
+//                        .fontWeight(.semibold)
+//                        .foregroundStyle(Color("Text Colour"))
+//                        .frame(maxWidth: .infinity, alignment: .leading)
+//                        .padding([.top, .leading, .trailing])
                     
-                    NavigationLink(destination: SetGoodPostureView()) {
-                        Text("Set Good Posture")
-                    }
-                    .padding(.all)
-                    .foregroundStyle(Color("Button Text Colour"))
-                    .fontWeight(.semibold)
-                    .background(Color("AccentColor"))
-                    .clipShape(Capsule())
-                    
-                    Text("Update Email Address")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color("Text Colour"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding([.top, .leading, .trailing])
-                    
-                    TextField("New Email Address", text: $emailAddress)
-                        .autocorrectionDisabled()
-                        .autocapitalization(.none)
-                        .textContentType(.emailAddress)
-                        .textFieldStyle(.roundedBorder)
-                        .foregroundStyle(Color("Text Colour"))
-                        .padding([.leading, .bottom, .trailing])
-                    
+//                    TextField("New Email Address", text: $emailAddress)
+//                        .autocorrectionDisabled()
+//                        .autocapitalization(.none)
+//                        .textContentType(.emailAddress)
+//                        .textFieldStyle(.roundedBorder)
+//                        .foregroundStyle(Color("Text Colour"))
+//                        .padding([.leading, .bottom, .trailing])
+//                    
 //                    Button("Update Email") {
 //                        correctEmail = emailAddress
 //                        emailAddress = ""
 //                    }
-                    .padding(.all)
-                    .foregroundStyle(Color("Button Text Colour"))
-                    .fontWeight(.semibold)
-                    .background(Color("AccentColor"))
-                    .clipShape(Capsule())
+//                    .padding(.all)
+//                    .foregroundStyle(Color("Button Text Colour"))
+//                    .fontWeight(.semibold)
+//                    .background(Color("AccentColor"))
+//                    .clipShape(Capsule())
                     
                     Spacer()
                     
 //                    NavigationLink(destination: ChangePasswordView(correctPassword: $correctPassword)) {
 //                        Text("Update Password")
-//                    }
-                    .padding(.all)
-                    .foregroundStyle(Color("Button Text Colour"))
-                    .fontWeight(.semibold)
-                    .background(Color("AccentColor"))
-                    .clipShape(Capsule())
-                    
+////                    }
+//                    .padding(.all)
+//                    .foregroundStyle(Color("Button Text Colour"))
+//                    .fontWeight(.semibold)
+//                    .background(Color("AccentColor"))
+//                    .clipShape(Capsule())
+//                    
                     Spacer()
                     
                     Button("Log Out") {

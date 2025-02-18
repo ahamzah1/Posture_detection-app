@@ -1,3 +1,10 @@
+//
+//  ChangePasswordView.swift
+//  AlignPro
+//
+//  Created by Jim Greenwood on 2025-01-02.
+//
+
 import SwiftUI
 
 struct ChangePasswordView: View {
