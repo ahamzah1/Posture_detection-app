@@ -24,9 +24,13 @@ struct ContentView: View {
                 }
 
                 if isLoggedIn {
-                    MainTabView(isLoggedIn: $isLoggedIn)
+                    NavigationStack{
+                        MainTabView(isLoggedIn: $isLoggedIn)
+                    }
                 } else {
-                    LoginView(isLoggedIn: $isLoggedIn)
+                    NavigationStack{
+                        LoginView(isLoggedIn: $isLoggedIn)
+                    }
                 }
             }
         }

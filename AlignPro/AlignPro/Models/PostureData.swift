@@ -11,9 +11,9 @@ import Foundation
 struct PostureData: CustomStringConvertible {
     let timestamp: Date
     let position: String
-    let postureStatus: String
+    let badPosturePercentage: Float
 
     var description: String {
-        return "PostureData(timestamp: \(timestamp), position: \(position), postureStatus: \(postureStatus))"
+        return "PostureData(timestamp: \(timestamp), position: \(position), badPosturePercentage: \(badPosturePercentage))"
     }
 }
